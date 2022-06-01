@@ -1,0 +1,158 @@
+version: "3.3"
+services:
+
+  zk1:
+    image: confluentinc/cp-zookeeper:6.2.0
+    hostname: zk1
+    container_name: zk1
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "2"
+        max-size: "2048m"
+    ports:
+      - 22181:22181
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 22181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zk1:22888:23888
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=srvr,mntr" 
+    labels: 
+      - co.elastic.metrics/module=zookeeper 
+      - co.elastic.metrics/hosts=zk1:22181
+      - co.elastic.metrics/metricsets=mntr,server
+
+  kafka1:
+    image: confluentinc/cp-server:6.2.0
+    hostname: kafka1
+    container_name: kafka1
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "2"
+        max-size: "2048m"
+    depends_on:
+      - zk1
+    ports:
+      - 19092:19092
+      - 19091:19091
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zk1:22181
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_INTERNAL://kafka1:19092,LISTENER_EXTERNAL://kafka1:19091
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_INTERNAL:PLAINTEXT,LISTENER_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_INTERNAL
+      KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka1:19092
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      CONFLUENT_METRICS_ENABLE: 'true'
+      CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
+    labels: 
+      - co.elastic.logs/module=kafka 
+      - co.elastic.metrics/module=kafka 
+      - co.elastic.metrics/metricsets=partition,consumergroup 
+      - co.elastic.metrics/hosts='$${data.container.name}:19092'
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:6.2.0
+    hostname: schema-registry
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "2"
+        max-size: "2048m"
+    container_name: schema-registry
+    ports:
+      - 8081:8081
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka1:19092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:6.2.0
+    hostname: kafka-connect
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "2"
+        max-size: "2048m"
+    container_name: kafka-connect
+    depends_on:
+      - schema-registry
+    ports:
+      - 8083:8083
+    volumes:
+      - ./kafka/kafka-connect:/data
+      - ./secrets:/secrets
+      - .:/registry
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka1:19092
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: kafka-connect
+      CONNECT_CONFIG_STORAGE_TOPIC: kafka-connect-configs
+      CONNECT_OFFSET_STORAGE_TOPIC: kafka-connect-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: kafka-connect-status
+      CONNECT_KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_REST_ADVERTISED_HOST_NAME: "kafka-connect"
+      CONNECT_LOG4J_APPENDER_STDOUT_LAYOUT_CONVERSIONPATTERN: "[%d] %p %X{connector.context}%m (%c:%L)%n"
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components,/data/connect-jars
+      CONNECT_CONFIG_PROVIDERS: file
+      CONNECT_CONFIG_PROVIDERS_FILE_CLASS: org.apache.kafka.common.config.provider.FileConfigProvider
+    command: bash /registry/connect.sh
+
+  mysql:
+    image: quay.io/debezium/example-mysql:1.9
+    ports:
+     - 3306:3306
+    environment:
+     - MYSQL_ROOT_PASSWORD=debezium
+     - MYSQL_USER=mysqluser
+     - MYSQL_PASSWORD=mysqlpw
+
+  postgres:
+    image: quay.io/debezium/postgres:9.6
+    ports:
+     - "5432:5432"
+    environment:
+     - POSTGRES_USER=postgresuser
+     - POSTGRES_PASSWORD=postgrespw
+     - POSTGRES_DB=inventory
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:0.2.0
+    container_name: kafka-ui
+    ports:
+      - "9095:8080"
+    restart: always
+    logging:
+        driver: "json-file"
+        options:
+            max-file: "5"
+            max-size: "1024m"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=majoo
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka1:19092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zk1:22181
+      # - KAFKA_CLUSTERS_0_KSQLDBSERVER=http://10.130.233.190:8088
+      # - KAFKA_CLUSTERS_0_SCHEMAREGISTRY=http://10.130.233.190:8081
+      - KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME=kafka-connect
+      - KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS=http://kafka-connect:8083
