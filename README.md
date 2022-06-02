@@ -6,15 +6,26 @@
 
 - [Docker Compose File](./docker-compose.yaml)
 
-    Add CONNECT_CONFIG_PROVIDERS and CONNECT_CONFIG_PROVIDERS_FILE_CLASS to environment
+    Add CONNECT_CONFIG_PROVIDERS and CONNECT_CONFIG_PROVIDERS_FILE_CLASS to kafka-connect environment
     ```
     kafka-connect:
-        image: confluentinc/cp-kafka-connect:6.2.0
-        hostname: kafka-connect
-        ...
-        environment:
-            CONNECT_CONFIG_PROVIDERS: file
-            CONNECT_CONFIG_PROVIDERS_FILE_CLASS: org.apache.kafka.common.config.provider.FileConfigProvider
+      image: confluentinc/cp-kafka-connect:6.2.0
+      hostname: kafka-connect
+      ...
+      environment:
+          CONNECT_CONFIG_PROVIDERS: file
+          CONNECT_CONFIG_PROVIDERS_FILE_CLASS: org.apache.kafka.common.config.provider.FileConfigProvider
+    ```
+    
+    Also add the ./secrets folder to kafka-connect volumes
+    ```
+    kafka-connect:
+      image: confluentinc/cp-kafka-connect:6.2.0
+      hostname: kafka-connect
+      ...
+      volumes:
+        - ./kafka/kafka-connect:/data
+        - ./secrets:/secrets
     ```
 
 - [Source Secret File](./secrets/source.properties)
