@@ -19,11 +19,7 @@ services:
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
       ZOOKEEPER_SERVERS: zk1:22888:23888
-      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=srvr,mntr" 
-    labels: 
-      - co.elastic.metrics/module=zookeeper 
-      - co.elastic.metrics/hosts=zk1:22181
-      - co.elastic.metrics/metricsets=mntr,server
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=srvr,mntr"
 
   kafka1:
     image: confluentinc/cp-server:6.2.0
@@ -57,11 +53,6 @@ services:
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'true'
       CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
-    labels: 
-      - co.elastic.logs/module=kafka 
-      - co.elastic.metrics/module=kafka 
-      - co.elastic.metrics/metricsets=partition,consumergroup 
-      - co.elastic.metrics/hosts='$${data.container.name}:19092'
 
   schema-registry:
     image: confluentinc/cp-schema-registry:6.2.0
@@ -152,7 +143,5 @@ services:
       - KAFKA_CLUSTERS_0_NAME=majoo
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka1:19092
       - KAFKA_CLUSTERS_0_ZOOKEEPER=zk1:22181
-      # - KAFKA_CLUSTERS_0_KSQLDBSERVER=http://10.130.233.190:8088
-      # - KAFKA_CLUSTERS_0_SCHEMAREGISTRY=http://10.130.233.190:8081
       - KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME=kafka-connect
       - KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS=http://kafka-connect:8083
