@@ -87,6 +87,7 @@ def update_or_create_connectors(configs, args):
                 headers=headers)
 
             LOGGER.info(f"Response: {response.status_code}")
+            LOGGER.info(f"Response: {response.content}")
 
             response.raise_for_status()
 

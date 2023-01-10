@@ -129,7 +129,7 @@ services:
      - POSTGRES_DB=inventory
 
   kafka-ui:
-    image: provectuslabs/kafka-ui:0.2.0
+    image: provectuslabs/kafka-ui:v0.4.0
     container_name: kafka-ui
     ports:
       - "9095:8080"
